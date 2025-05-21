@@ -12,7 +12,7 @@ export const Help = () => {
         <Text>{"🔍 search <query> - Search for issues"}</Text>
         <Text>
           {
-            "⏱️  toggle <daysAgo> <hours> - Import time entries from Toggle to Redmine"
+            "⏱️  toggl <daysAgo> <hours> - Import time entries from Toggl to Redmine"
           }
         </Text>
         <Text>

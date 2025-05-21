@@ -8,7 +8,7 @@ import { Entries } from "./components/Entries.js";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { CommandsProps } from "./components/types.js";
 import { Search } from "./components/Search.js";
-import { Toggle } from "./components/Toggle.js";
+import { Toggl } from "./components/Toggl.js";
 import { MonthlySummary } from "./components/MonthlySummary.js";
 import { DeleteEntry } from "./components/DeleteEntry.js";
 import { CreateTask } from "./components/CreateTask.js";
@@ -19,7 +19,7 @@ const OutputMap: Record<string, (props: CommandsProps) => JSX.Element> = {
   "-h": Help,
   "get-entries": Entries,
   search: Search,
-  toggle: Toggle,
+  toggl: Toggl,
   "print-monthly-summary": MonthlySummary,
   delete: DeleteEntry,
   "create-task": CreateTask,

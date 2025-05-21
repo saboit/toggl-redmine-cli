@@ -20,7 +20,7 @@ const year = today.getFullYear();
 const month = today.getMonth();
 const days = getDaysFromDate(today);
 
-const ToggleInternal = ({
+const TogglInternal = ({
   date,
   totalHours,
 }: {
@@ -31,15 +31,15 @@ const ToggleInternal = ({
   const [shouldTrackRedmine, setShouldTrackRedmine] = useState(false);
 
   const { data: entries = [], isLoading } = useQuery({
-    queryKey: ["toggle", date],
+    queryKey: ["toggl", date],
     queryFn: async () => {
-      const toggleEntries = await fetchTogglTimeEntries(
+      const togglEntries = await fetchTogglTimeEntries(
         togglClient,
         date,
         togglWorkspaceId
       );
-      // Implement the toggle logic here
-      return prepareRedmineEntries(toggleEntries, totalHours);
+      // Implement the toggl logic here
+      return prepareRedmineEntries(togglEntries, totalHours);
     },
     refetchOnWindowFocus: false,
   });
@@ -114,7 +114,7 @@ const options = days
   })
   .reverse();
 
-export const Toggle = ({ args }: CommandsProps) => {
+export const Toggl = ({ args }: CommandsProps) => {
   const [arg1, arg2] = args ?? [];
   const daysAgo = parseInt(arg1);
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -182,5 +182,5 @@ export const Toggle = ({ args }: CommandsProps) => {
     );
   }
 
-  return <ToggleInternal date={selectedDate} totalHours={submittedHours} />;
+  return <TogglInternal date={selectedDate} totalHours={submittedHours} />;
 };

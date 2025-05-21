@@ -85,12 +85,12 @@ Example:
 redmine create-task "New Feature" "MyProject"
 ```
 
-### `toggle`
+### `toggl`
 
 Imports time entries from Toggl to Redmine.
 
 ```sh
-redmine toggle <daysAgo> <totalHours>
+redmine toggl <daysAgo> <totalHours>
 ```
 
 - `<daysAgo>`: The number of days ago to fetch the time entries from Toggl (default is 0).
@@ -99,7 +99,7 @@ redmine toggle <daysAgo> <totalHours>
 Example:
 
 ```sh
-redmine toggle 1 8
+redmine toggl 1 8
 ```
 
 ### `track`

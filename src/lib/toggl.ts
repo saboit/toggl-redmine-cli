@@ -27,7 +27,6 @@ export async function fetchTogglTimeEntries(
     end_date: `${date}T23:59:59${tzOffsetHrsFormatted}:00`,
     workspace_id: togglWorkspaceId,
   };
-  console.log(`Toggl.getMyEntries ${client.getConfig().baseUrl} ${params}`);
 
   console.log("🔍 Fetching Toggl time entries with params:", params)
   const response = await getMyTimeEntries({
