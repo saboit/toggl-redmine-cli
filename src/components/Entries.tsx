@@ -3,7 +3,6 @@ import { getDateString } from "../lib/helpers.js";
 import { fetchUserTimeEntries } from "../lib/redmine.js";
 import { Box, Text } from "ink";
 import { useQuery } from "@tanstack/react-query";
-import { redmineClient } from "@saboit/toggl-redmine-bridge";
 import { CommandsProps } from "./types.js";
 
 export const Entries = ({ args }: CommandsProps) => {
@@ -12,7 +11,7 @@ export const Entries = ({ args }: CommandsProps) => {
   const date = getDateString(daysAgo);
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["entries", date],
-    queryFn: () => fetchUserTimeEntries(redmineClient, date),
+    queryFn: () => fetchUserTimeEntries(date),
     refetchOnWindowFocus: false,
   });
 

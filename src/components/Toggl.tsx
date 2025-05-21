@@ -7,7 +7,6 @@ import {
 import { Box, Text, useApp } from "ink";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { fetchTogglTimeEntries } from "../lib/toggl.js";
-import { redmineClient, togglClient } from "@saboit/toggl-redmine-bridge";
 import { prepareRedmineEntries, trackTimeInRedmine } from "../lib/redmine.js";
 import { ConfirmInput } from "./ConfirmInput.js";
 import SelectInput from "ink-select-input";
@@ -34,7 +33,6 @@ const TogglInternal = ({
     queryKey: ["toggl", date],
     queryFn: async () => {
       const togglEntries = await fetchTogglTimeEntries(
-        togglClient,
         date,
         togglWorkspaceId
       );
@@ -47,7 +45,7 @@ const TogglInternal = ({
   const { mutate, isSuccess, isPending } = useMutation({
     mutationKey: ["track", date],
     mutationFn: async () => {
-      await trackTimeInRedmine(redmineClient, entries);
+      await trackTimeInRedmine(entries);
     },
     onSuccess: () => {
       exit();

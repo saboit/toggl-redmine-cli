@@ -13,6 +13,9 @@ import { MonthlySummary } from "./components/MonthlySummary.js";
 import { DeleteEntry } from "./components/DeleteEntry.js";
 import { CreateTask } from "./components/CreateTask.js";
 import SelectInput from "ink-select-input";
+import { Projects } from "./components/Projects.js";
+
+configure();
 
 const OutputMap: Record<string, (props: CommandsProps) => JSX.Element> = {
   "--help": Help,
@@ -23,9 +26,8 @@ const OutputMap: Record<string, (props: CommandsProps) => JSX.Element> = {
   "print-monthly-summary": MonthlySummary,
   delete: DeleteEntry,
   "create-task": CreateTask,
+  "projects": Projects
 };
-
-configure();
 
 const App = () => {
   const [command, ...args] = process.argv.slice(2);

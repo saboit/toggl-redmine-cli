@@ -1,7 +1,8 @@
 import { getActivityId } from "./activities.js";
 import { ModelsTimeEntry as TogglTimeEntry } from "@saboit/toggl-redmine-bridge/api-toggl";
 import { createTimeEntry, getProjects, getTimeEntries, TimeEntry as RedmineTimeEntry, deleteTimeEntry as redmineDeleteTimeEntry, search, Search } from "@saboit/toggl-redmine-bridge/api-redmine";
-import { Client } from "@hey-api/client-fetch";
+import { getIssues, IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { redmineClient } from "@saboit/toggl-redmine-bridge";
 
 // Redmine un-official OpenAPI does define the TimeEntry model but it is used only for responses (?)
 // And the call `createTimeEntry` parameter defines slightly different structure (inline, anonymous)
@@ -21,7 +22,7 @@ interface Project {
 }
 
 // Function to fetch all projects from Redmine
-async function fetchAllProjects(redmineClient: Client): Promise<Project[]> {
+async function fetchAllProjects(): Promise<Project[]> {
 
   let allProjects: Project[] = [];
   let offset = 0;
@@ -66,14 +67,6 @@ async function fetchAllProjects(redmineClient: Client): Promise<Project[]> {
     }
   }
   return allProjects;
-}
-
-function getTrackerId(trackerName: string): number {
-  const trackersMap: { [key: string]: number } = {
-    Task: 5,
-    Bug: 1,
-  };
-  return trackersMap[trackerName] || 5; // Default to Task if not found
 }
 
 const LOG_PRECISELY = "lp";
@@ -149,8 +142,7 @@ function prepareRedmineEntries(
 }
 
 async function trackTimeInRedmine(
-  redmineClient: Client,
-  redmineEntries: RedmineEntry[],
+  redmineEntries: RedmineEntry[]
 ): Promise<RedmineTimeEntry[]> {
   let createdEntries: RedmineTimeEntry[] = [];
   for (const entry of redmineEntries) {
@@ -170,7 +162,6 @@ async function trackTimeInRedmine(
 
 // Function to search issues using the standard Redmine API
 async function searchIssues(
-  redmineClient: Client,
   searchQuery: string
 ): Promise<Search[]> {
   const response = await search({
@@ -186,7 +177,6 @@ async function searchIssues(
 
 // Function to fetch the user's tracked time entries from Redmine
 async function fetchUserTimeEntries(
-  redmineClient: Client,
   date: string
 ): Promise<RedmineTimeEntry[]> {
 
@@ -204,7 +194,6 @@ async function fetchUserTimeEntries(
 
 // Function to delete a time entry from Redmine
 async function deleteTimeEntry(
-  redmineClient: Client,
   entryId: number
 ): Promise<void> {
 
@@ -218,6 +207,18 @@ async function deleteTimeEntry(
   // deleteTimeEntry response.data is void 
 }
 
+async function getIssuesFromQuery(queryId: number): Promise<IssueSimple[]> {
+  const queryResponse = await getIssues({
+    client: redmineClient,
+    path: { format: "json" },
+    query: { query_id: queryId }
+  });
+  if(queryResponse.error) {
+    throw new Error(`HTTP error: ${queryResponse.error}`);
+  }
+  return queryResponse.data!.issues;
+}
+
 export {
   fetchAllProjects,
   trackTimeInRedmine,
@@ -225,4 +226,5 @@ export {
   prepareRedmineEntries,
   fetchUserTimeEntries,
   deleteTimeEntry,
+  getIssuesFromQuery as fetchMyOpenIssues
 };

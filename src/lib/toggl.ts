@@ -1,8 +1,8 @@
-import { Client } from "@hey-api/client-fetch";
-import { getMyTimeEntries, ModelsTimeEntry } from "@saboit/toggl-redmine-bridge/api-toggl";
+import { getMyTimeEntries, ModelsTimeEntry, postWorkspaceProjectCreate } from "@saboit/toggl-redmine-bridge/api-toggl";
+import { togglClient } from "@saboit/toggl-redmine-bridge";
+import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
 
 export async function fetchTogglTimeEntries(
-  client: Client,
   date: string,
   togglWorkspaceId: string
 ): Promise<ModelsTimeEntry[]> {
@@ -30,7 +30,6 @@ export async function fetchTogglTimeEntries(
 
   console.log("🔍 Fetching Toggl time entries with params:", params)
   const response = await getMyTimeEntries({
-    client,
     query: {
       ...params,
       meta: false,
@@ -40,9 +39,9 @@ export async function fetchTogglTimeEntries(
   if(response.error) {
     console.error("❌ Failed to fetch Toggl time entries:", response.error);
     console.error("🔍 Error details:", {
-      client: client.getConfig().baseUrl,
+      client: togglClient.getConfig().baseUrl,
       params,
-      headers: client.getConfig().headers,
+      headers: togglClient.getConfig().headers,
     });
     process.exit(1);
   } else {
@@ -52,4 +51,45 @@ export async function fetchTogglTimeEntries(
     }));
     
   }
+}
+
+export async function createProjectsFromIssues(
+  togglWorkspaceId: number,
+  issues: IssueSimple[]
+): Promise<number[]> {
+  async function createProject(projectName: string): Promise<number> {
+    const response = await postWorkspaceProjectCreate({
+      path: {
+        workspace_id: togglWorkspaceId,
+      },
+      body: {
+        name: projectName,
+        is_private: true,
+        active: true,
+      }
+    })
+    if(response.error) {
+      throw new Error(`HTTP error: ${response.error}`);
+    }
+    return response.data!.id!;
+  }
+  function ellipsis(str: string, maxLength: number): string {
+    if (str.length <= maxLength) {
+      return str;
+    }
+    return str.slice(0, maxLength - 3) + "...";
+  }
+  const togglProjectNames = issues.map((issue) => `#${issue.id} ${ellipsis(issue.subject, 30)} ${issue.project.name}`);
+  togglProjectNames.forEach((name) => {
+    console.log(`Creating project: ${name}`);
+  });
+  // map is bad to endpoint, executes in parallel
+  // reduce is sequential but cryptic syntax
+  let ids: number[] = [];
+  for(const name of togglProjectNames) {
+    const id = await createProject(name);
+    console.log(`${name} => ${id}`);
+    ids.push(id);
+  };
+  return ids;
 }

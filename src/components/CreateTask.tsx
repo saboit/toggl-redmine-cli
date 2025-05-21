@@ -28,7 +28,7 @@ export const CreateTask = () => {
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["projects"],
     queryFn: async () => {
-      return fetchAllProjects(redmineClient);
+      return fetchAllProjects();
     },
   });
 

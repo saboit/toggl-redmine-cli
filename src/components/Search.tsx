@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { Box, Text } from "ink";
 import { useQuery } from "@tanstack/react-query";
-import { redmineClient } from "@saboit/toggl-redmine-bridge";
 import { searchIssues } from "../lib/redmine.js";
 import TextInput from "ink-text-input";
 
@@ -12,7 +11,7 @@ export const Search = () => {
     queryKey: ["search", searchQuery],
     queryFn: () => {
       // Implement the search logic here
-      return searchIssues(redmineClient, searchQuery);
+      return searchIssues(searchQuery);
     },
     enabled: searchQuery.length > 0,
   });
