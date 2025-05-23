@@ -6,13 +6,11 @@ import {
 } from "../lib/helpers.js";
 import { Box, Text, useApp } from "ink";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchTogglTimeEntries } from "../lib/toggl.js";
+import { fetchTogglTimeEntries, getProjectNames } from "../lib/toggl.js";
 import { prepareRedmineEntries, trackTimeInRedmine } from "../lib/redmine.js";
 import { ConfirmInput } from "./ConfirmInput.js";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
-
-const togglWorkspaceId = process.env.TOGGL_WORKSPACE_ID!;
 
 const today = new Date();
 const year = today.getFullYear();
@@ -32,11 +30,26 @@ const TogglInternal = ({
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["toggl", date],
     queryFn: async () => {
-      const togglEntries = await fetchTogglTimeEntries(
+      const togglWorkspaceStr = process.env.TOGGL_WORKSPACE_ID!;
+      const togglWorkspaceNum = Number.parseInt(togglWorkspaceStr, 10);
+
+      let togglEntries = await fetchTogglTimeEntries(
         date,
-        togglWorkspaceId
+        togglWorkspaceNum
       );
-      // Implement the toggl logic here
+      const togglProjectNames = await getProjectNames(togglWorkspaceNum);
+      togglEntries.forEach((entry) => {
+        if (!entry.project_id) {
+          console.log(`No project id, RM ID expected in: "${entry.description}"`);
+        } else {
+          let projectName = togglProjectNames[entry.project_id!];
+          if(!projectName) {
+            console.log(`Toggl project ID ${entry.project_id} does not have a name!`);
+            projectName = "UNDEFINED_PROJECT_NAME"
+          }
+          entry.project_name = projectName;
+        }
+      });
       return prepareRedmineEntries(togglEntries, totalHours);
     },
     refetchOnWindowFocus: false,

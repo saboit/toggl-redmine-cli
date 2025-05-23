@@ -1,10 +1,10 @@
-import { getMyTimeEntries, ModelsTimeEntry, postWorkspaceProjectCreate } from "@saboit/toggl-redmine-bridge/api-toggl";
+import { getMyTimeEntries, getProjects, ModelsTimeEntry, postWorkspaceProjectCreate } from "@saboit/toggl-redmine-bridge/api-toggl";
 import { togglClient } from "@saboit/toggl-redmine-bridge";
 import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
 
 export async function fetchTogglTimeEntries(
   date: string,
-  togglWorkspaceId: string
+  togglWorkspaceId: number
 ): Promise<ModelsTimeEntry[]> {
 
   // #TODO: get the account's desired TZ offset from Toggl API, not from local machine. It will be most probably equal, but not guaranteed.
@@ -69,7 +69,7 @@ export async function createProjectsFromIssues(
       }
     })
     if(response.error) {
-      throw new Error(`HTTP error: ${response.error}`);
+      throw new Error(response.error);
     }
     return response.data!.id!;
   }
@@ -80,16 +80,48 @@ export async function createProjectsFromIssues(
     return str.slice(0, maxLength - 3) + "...";
   }
   const togglProjectNames = issues.map((issue) => `#${issue.id} ${ellipsis(issue.subject, 30)} ${issue.project.name}`);
-  togglProjectNames.forEach((name) => {
-    console.log(`Creating project: ${name}`);
-  });
   // map is bad to endpoint, executes in parallel
   // reduce is sequential but cryptic syntax
   let ids: number[] = [];
   for(const name of togglProjectNames) {
-    const id = await createProject(name);
-    console.log(`${name} => ${id}`);
-    ids.push(id);
+    try {
+      const id = await createProject(name);
+      console.log(`${name} => Created Toggl project ${id}`);
+      ids.push(id);
+    } catch (error) {
+      console.log(`${error}`);
+    }
   };
   return ids;
 }
+
+export type ProjectsNames = {
+  [key: string]: string;
+};
+
+export async function getProjectNames(
+  togglWorkspaceId: number
+): Promise<ProjectsNames> {
+  const response = await getProjects({
+    path: {
+      workspace_id: togglWorkspaceId
+    },
+    query: {
+      sort_pinned: false
+    }
+  });
+  if(response.error) {
+    throw new Error(`HTTP error: ${response.error}`);
+  }
+  let retval: ProjectsNames = {};
+  response.data!.forEach((project) => {
+    // The declared type is ModelsProject which declares property "client_name"
+    // But the returned type has property "name". 
+    // It looks more like ProjectPayload or ModelsTask, but neither is 100% correct
+    // so let's give up fixing the Toggl OpenAPI mess and just force cast it
+    const forceType = project as { id: number; name: string };
+    retval[forceType.id] = forceType.name;
+  })
+  return retval;
+};
+

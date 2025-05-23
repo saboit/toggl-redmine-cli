@@ -108,11 +108,20 @@ function prepareRedmineEntries(
 
   togglEntries.forEach((entry) => {
     const description = entry.description || "";
+    const projectName = entry.project_name || "";
     const durationSeconds = entry.duration!;
     const spentOn = entry.start!.substring(0, 10);
 
     const issueIdMatch = description.match(/#(\d+)/);
-    const issueId = issueIdMatch ? issueIdMatch[1] : null;
+    let issueId: string | null = null;
+    if (issueIdMatch) {
+      issueId = issueIdMatch[1];
+    } else {
+      const projectMatch = projectName.match(/#(\d+)/);
+      if (projectMatch) {
+        issueId = projectMatch[1];
+      }
+    }
 
     const adjustedDurationHours =
       (durationSeconds / 3600) *
