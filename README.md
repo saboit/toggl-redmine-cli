@@ -55,6 +55,7 @@ Create a `.env` file in the project root directory and set the following environ
 - `REDMINE_API_URL`: The base URL of your Redmine instance (e.g., `https://redmine.example.com`).
 - `DEFAULT_PROJECT`: The default Redmine project name for creating tasks.
 - `ACTIVITIES_MAP`: A JSON string mapping activity tags to Redmine activity IDs.
+- `MYISSUES_QUERY_IDS`: Comma-separated list of Redmine issue-query IDs, e.g. `https://redmine.saboit.de/issues?query_id=42`. User creates his own queries to gather issues that he is working on or wants to track on. The issue numbers can overlap and will be deduplicated. The resulting list of issues will be used in command `projects`.
 
 **Note**: Keep your API tokens and keys secure and do not share them publicly.
 
@@ -182,6 +183,17 @@ Example:
 ```sh
 redmine print-monthly-summary
 ```
+
+### `projects`
+
+The command has no interaction with the user. The command will fetch issues from user-defined Redmine queries as described in the `MYISSUES_QUERY_IDS` env-var. Then the command will create Toggl projects named as the Redmine issues. If the project with the same name already exists, the command will warn the user. The created project names then can be selected when creating Toggl time entries and this tool will then use Redmine issue id found in the project name. If the time entry name still contains Redmine issue id (as if not using the `projects` feature at all), the Redmine issue in the time entry name will take preccedence over the project name.
+
+```sh
+redmine projects
+```
+
+The command will execute Redmine issue queries from the list configured by the user as 
+
 
 ## 🏷️ Labels and Their Purpose
 
