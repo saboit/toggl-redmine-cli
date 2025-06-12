@@ -161,9 +161,14 @@ async function trackTimeInRedmine(
       body: entry
     })
     if(response.error) {
-      throw new Error(`HTTP error: ${response.error}`);
+      const errorMessage = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${JSON.stringify(response.error)}`;
+      console.log(errorMessage);
+      throw new Error(errorMessage);
     } else {
-      createdEntries.push(response.data!.time_entry);
+      const createdEntry = response.data!.time_entry;
+      createdEntries.push(createdEntry);
+      const successMessage = `Redmine entry "${createdEntry.id} ${createdEntry.comments}" CREATED ${createdEntry.issue?.id}`;
+      console.log(successMessage);
     }
   }
   return createdEntries;
