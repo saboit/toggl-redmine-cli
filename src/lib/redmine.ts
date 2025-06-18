@@ -106,7 +106,9 @@ function prepareRedmineEntries(
 
   let redmineEntries: RedmineEntry[] = [];
 
-  togglEntries.forEach((entry) => {
+  togglEntries.sort((a, b) => {
+    return new Date(a.start!).getTime() - new Date(b.start!).getTime();
+  }).forEach((entry) => {
     const description = entry.description || "";
     const projectName = entry.project_name || "";
     const durationSeconds = entry.duration!;

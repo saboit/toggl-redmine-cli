@@ -26,6 +26,7 @@ const TogglInternal = ({
 }) => {
   const { exit } = useApp();
   const [shouldTrackRedmine, setShouldTrackRedmine] = useState(false);
+  const [reportedHoursSum, setReportedHoursSum] = useState(0);
 
   const { data: entries = [], isLoading } = useQuery({
     queryKey: ["toggl", date],
@@ -38,6 +39,7 @@ const TogglInternal = ({
         togglWorkspaceNum
       );
       const togglProjectNames = await getProjectNames(togglWorkspaceNum);
+      let reportedSecondsSum = 0;
       togglEntries.forEach((entry) => {
         if (!entry.project_id) {
           console.log(`No project id, RM ID expected in: "${entry.description}"`);
@@ -49,7 +51,9 @@ const TogglInternal = ({
           }
           entry.project_name = projectName;
         }
+        reportedSecondsSum += entry.duration || 0;
       });
+      setReportedHoursSum(reportedSecondsSum / (60*60));
       return prepareRedmineEntries(togglEntries, totalHours);
     },
     refetchOnWindowFocus: false,
@@ -91,8 +95,7 @@ const TogglInternal = ({
       {!shouldTrackRedmine && (
         <Box flexDirection="column">
           <Text>
-            Do you want to proceed with tracking these time entries in Redmine?
-            (y/n)
+            {`Do you want to proceed with tracking ${reportedHoursSum}h time entries in Redmine? y/n`}
           </Text>
           <ConfirmInput
             onPress={(checked) => {
