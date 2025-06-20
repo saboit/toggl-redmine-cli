@@ -77,11 +77,9 @@ export async function createProjectsFromIssues(
     if (str.length <= maxLength) {
       return str;
     }
-    return str.slice(0, maxLength - 3) + "...";
+    return str.slice(0, maxLength - 1) + "~";
   }
-  const togglProjectNames = issues.map((issue) => `#${issue.id} ${ellipsis(issue.subject, 30)} ${issue.project.name}`);
-  // map is bad to endpoint, executes in parallel
-  // reduce is sequential but cryptic syntax
+  const togglProjectNames = issues.map((issue) => `#${issue.id} ${ellipsis(issue.subject, 40)} ${issue.project.name}`);
   let ids: number[] = [];
   for(const name of togglProjectNames) {
     try {
@@ -89,19 +87,21 @@ export async function createProjectsFromIssues(
       console.log(`${name} => Created Toggl project ${id}`);
       ids.push(id);
     } catch (error) {
-      console.log(`${error}`);
+      console.error(`${error}`);
     }
   };
   return ids;
 }
 
-export type ProjectsNames = {
-  [key: string]: string;
+export interface TogglProject {
+  togglId: number
+  redmineId: number;
+  fullName: string;
 };
 
-export async function getProjectNames(
+export async function getTogglProjects(
   togglWorkspaceId: number
-): Promise<ProjectsNames> {
+): Promise<TogglProject[]> {
   const response = await getProjects({
     path: {
       workspace_id: togglWorkspaceId
@@ -113,15 +113,39 @@ export async function getProjectNames(
   if(response.error) {
     throw new Error(`HTTP error: ${response.error}`);
   }
-  let retval: ProjectsNames = {};
+  let retval: TogglProject[] = [];
   response.data!.forEach((project) => {
     // The declared type is ModelsProject which declares property "client_name"
     // But the returned type has property "name". 
     // It looks more like ProjectPayload or ModelsTask, but neither is 100% correct
     // so let's give up fixing the Toggl OpenAPI mess and just force cast it
     const forceType = project as { id: number; name: string };
-    retval[forceType.id] = forceType.name;
+    const redmineIdMatch = forceType.name.match(/^#(\d+)/);
+    if(!redmineIdMatch) {
+      console.error(`Toggl project "${forceType.name}" does not match Redmine ID pattern, skipping.`);
+      return;
+    }
+    retval.push({
+      togglId: forceType.id,
+      redmineId: parseInt(redmineIdMatch[1], 10),
+      fullName: forceType.name
+    });
   })
   return retval;
 };
+
+export type RedmineToTogglMap = {
+  [key: number]: number;
+};
+
+export async function getRedmineToTogglMap(
+  togglWorkspaceId: number
+): Promise<RedmineToTogglMap> {
+  const togglProjects = await getTogglProjects(togglWorkspaceId);
+  let map: RedmineToTogglMap = {};
+  togglProjects.forEach((togglProject) => {
+    map[togglProject.redmineId] = togglProject.togglId;
+  });
+  return map;
+}
 

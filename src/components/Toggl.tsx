@@ -6,7 +6,7 @@ import {
 } from "../lib/helpers.js";
 import { Box, Text, useApp } from "ink";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchTogglTimeEntries, getProjectNames } from "../lib/toggl.js";
+import { fetchTogglTimeEntries, getTogglProjects } from "../lib/toggl.js";
 import { prepareRedmineEntries, trackTimeInRedmine } from "../lib/redmine.js";
 import { ConfirmInput } from "./ConfirmInput.js";
 import SelectInput from "ink-select-input";
@@ -38,15 +38,15 @@ const TogglInternal = ({
         date,
         togglWorkspaceNum
       );
-      const togglProjectNames = await getProjectNames(togglWorkspaceNum);
+      const togglProjectNames = await getTogglProjects(togglWorkspaceNum);
       let reportedSecondsSum = 0;
       togglEntries.forEach((entry) => {
         if (!entry.project_id) {
-          console.log(`No project id, RM ID expected in: "${entry.description}"`);
+          console.log(`Toggl entry has no project assigned, RM ID expected in: "${entry.description}"`);
         } else {
-          let projectName = togglProjectNames[entry.project_id!];
+          let projectName = togglProjectNames.find((project) => project.togglId === entry.project_id!)?.fullName;
           if(!projectName) {
-            console.log(`Toggl project ID ${entry.project_id} does not have a name!`);
+            console.log(`Toggl entry has assigned project ID ${entry.project_id} without a name, cannot search for RM ID`);
             projectName = "UNDEFINED_PROJECT_NAME"
           }
           entry.project_name = projectName;
