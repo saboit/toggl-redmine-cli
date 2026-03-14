@@ -29,9 +29,10 @@ export const Help = () => {
           {"❌ delete <daysAgo> - Delete a time entry for a specific day"}
         </Text>
         <Text>
-          {
-            "📅 print-monthly-summary - Print a summary of your tracked hours for the current"
-          }
+          {"📅 print-monthly-summary - Print a summary of your tracked hours for the current"}
+        </Text>
+        <Text>
+          {"🔗 import-jira-issue [KEY...] - Import Jira issue(s) into Redmine (e.g. PROJ-123)"}
         </Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>
