@@ -1,6 +1,6 @@
 import { getActivityId } from "./activities.js";
 import { ModelsTimeEntry as TogglTimeEntry } from "@saboit/toggl-redmine-bridge/api-toggl";
-import { createTimeEntry, getProjects, getTimeEntries, TimeEntry as RedmineTimeEntry, deleteTimeEntry as redmineDeleteTimeEntry, search, Search } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { createTimeEntry, createIssue, getProjects, getTimeEntries, TimeEntry as RedmineTimeEntry, deleteTimeEntry as redmineDeleteTimeEntry, search, Search } from "@saboit/toggl-redmine-bridge/api-redmine";
 import { getIssues, IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
 import { redmineClient } from "@saboit/toggl-redmine-bridge";
 
@@ -235,6 +235,22 @@ async function getIssuesFromQuery(queryId: number): Promise<IssueSimple[]> {
   return queryResponse.data!.issues;
 }
 
+async function createRedmineIssue(
+  projectId: number,
+  subject: string,
+  description: string
+): Promise<{ id: number; subject: string }> {
+  const response = await createIssue({
+    client: redmineClient,
+    path: { format: "json" },
+    body: { issue: { project_id: projectId, subject, description } } as any,
+  });
+  if (response.error) {
+    throw new Error(`Failed to create Redmine issue: ${JSON.stringify(response.error)}`);
+  }
+  return response.data!.issue as { id: number; subject: string };
+}
+
 export {
   fetchAllProjects,
   trackTimeInRedmine,
@@ -242,5 +258,6 @@ export {
   prepareRedmineEntries,
   fetchUserTimeEntries,
   deleteTimeEntry,
+  createRedmineIssue,
   getIssuesFromQuery as fetchMyOpenIssues
 };
