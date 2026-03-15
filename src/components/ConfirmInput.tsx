@@ -26,7 +26,7 @@ export const ConfirmInput = ({
     }
   };
   return (
-    <Box flexDirection="column">
+    <Box gap={4}>
       <TextInput
         value={value}
         onChange={handleChange}

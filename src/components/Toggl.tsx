@@ -1,16 +1,17 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { CommandsProps } from "./types.js";
 import {
   getDateString,
   getDaysFromDate
 } from "../lib/helpers.js";
 import { Box, Text, useApp } from "ink";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchTogglTimeEntries, getTogglProjects } from "../lib/toggl.js";
-import { prepareRedmineEntries, trackTimeInRedmine } from "../lib/redmine.js";
+import { useMutation } from "@tanstack/react-query";
+import { prepareRedmineEntries, getOrphanEntries } from "../lib/redmine.js";
 import { ConfirmInput } from "./ConfirmInput.js";
 import SelectInput from "ink-select-input";
-import TextInput from "ink-text-input";
+import { createTimeEntry, } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
+import { useGetMyTimeEntries } from "@saboit/toggl-redmine-bridge/api-toggl-hooks";
+import { OrphanEntryResolver } from "./OrphanEntryResolver.js";
 
 const today = new Date();
 const year = today.getFullYear();
@@ -22,50 +23,40 @@ const TogglInternal = ({
   totalHours,
 }: {
   date: string;
-  totalHours: number;
+  totalHours?: number;
 }) => {
   const { exit } = useApp();
+  const [orphansResolved, setOrphansResolved] = useState(false);
   const [shouldTrackRedmine, setShouldTrackRedmine] = useState(false);
-  const [reportedHoursSum, setReportedHoursSum] = useState(0);
+  const [resolvedIssueIds, setResolvedIssueIds] = useState<Map<number, number>>(new Map());
+  const { data: timeEntries, isLoading } = useGetMyTimeEntries({ start_date: date, end_date: date });
 
-  const { data: entries = [], isLoading } = useQuery({
-    queryKey: ["toggl", date],
-    queryFn: async () => {
-      const togglWorkspaceStr = process.env.TOGGL_WORKSPACE_ID!;
-      const togglWorkspaceNum = Number.parseInt(togglWorkspaceStr, 10);
+  const timeEntriesForDate = useMemo(
+    () => timeEntries?.filter((entry) => entry.start?.startsWith(date)) ?? [],
+    [date, timeEntries]
+  );
 
-      let togglEntries = await fetchTogglTimeEntries(
-        date,
-        togglWorkspaceNum
-      );
-      const togglProjectNames = await getTogglProjects(togglWorkspaceNum);
-      let reportedSecondsSum = 0;
-      togglEntries.forEach((entry) => {
-        if (!entry.project_id) {
-          console.log(`Toggl entry has no project assigned, RM ID expected in: "${entry.description}"`);
-        } else {
-          let projectName = togglProjectNames.find((project) => project.togglId === entry.project_id!)?.fullName;
-          if(!projectName) {
-            console.log(`Toggl entry has assigned project ID ${entry.project_id} without a name, cannot search for RM ID`);
-            projectName = "UNDEFINED_PROJECT_NAME"
-          }
-          entry.project_name = projectName;
-        }
-        reportedSecondsSum += entry.duration || 0;
-      });
-      setReportedHoursSum(reportedSecondsSum / (60*60));
-      return prepareRedmineEntries(togglEntries, totalHours);
-    },
-    refetchOnWindowFocus: false,
-  });
+  const orphans = useMemo(() => getOrphanEntries(timeEntriesForDate), [timeEntriesForDate]);
+
+  const entries = useMemo(
+    () => prepareRedmineEntries(timeEntriesForDate, totalHours ?? 0, resolvedIssueIds),
+    [timeEntriesForDate, totalHours, resolvedIssueIds]
+  );
 
   const { mutate, isSuccess, isPending } = useMutation({
     mutationKey: ["track", date],
     mutationFn: async () => {
-      await trackTimeInRedmine(entries);
-    },
-    onSuccess: () => {
-      exit();
+      for (const entry of entries) {
+        try {
+          const result = await createTimeEntry('json', entry as any);
+          const created = result.time_entry;
+          console.log(`Redmine entry "${created.id} ${created.comments}" CREATED ${created.issue?.id}`);
+        } catch (error: any) {
+          const msg = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${error.message}`;
+          console.log(msg);
+          throw error;
+        }
+      }
     },
   });
 
@@ -73,11 +64,25 @@ const TogglInternal = ({
     return <Text>Loading...</Text>;
   }
 
+  if (!orphansResolved && orphans.length > 0) {
+    return (
+      <OrphanEntryResolver
+        orphans={orphans}
+        onDone={(resolved) => {
+          setResolvedIssueIds(resolved);
+          setOrphansResolved(true);
+        }}
+      />
+    );
+  }
+
   if (entries.length === 0) {
     return (
       <Text color="red">No time entries found for the selected date.</Text>
     );
   }
+
+  const hoursToReport = totalHours ?? entries.reduce((sum, entry) => sum + (entry.time_entry.hours || 0), 0);
 
   return (
     <Box flexDirection="column">
@@ -95,7 +100,7 @@ const TogglInternal = ({
       {!shouldTrackRedmine && (
         <Box flexDirection="column">
           <Text>
-            {`Do you want to proceed with tracking ${reportedHoursSum}h time entries in Redmine? y/n`}
+            {`Do you want to proceed with tracking ${hoursToReport.toFixed(2)}h time entries in Redmine? y/n`}
           </Text>
           <ConfirmInput
             onPress={(checked) => {
@@ -137,13 +142,13 @@ export const Toggl = ({ args }: CommandsProps) => {
     }
     return getDateString(daysAgo);
   });
-  const [submittedHours, setSubmittedHours] = useState(() => {
-    const parsedValue = parseInt(arg2);
-    return isNaN(parsedValue) ? undefined : parsedValue;
-  });
-  const [totalHours, setTotalHours] = useState(arg2);
+
+  const [totalHours, _setTotalHours] = useState(arg2);
   const [shouldTrack, setShouldTrack] = useState(false);
   const { exit } = useApp();
+
+  const parsedValue = parseInt(arg2);
+  const submittedHours = isNaN(parsedValue) ? undefined : parsedValue;
 
   if (!selectedDate) {
     return (
@@ -153,25 +158,6 @@ export const Toggl = ({ args }: CommandsProps) => {
           items={options}
           limit={10}
           onSelect={(item) => setSelectedDate(item.value)}
-        />
-      </Box>
-    );
-  }
-
-  if (submittedHours == null || submittedHours === undefined) {
-    const parsedValue = totalHours?.toString() ?? "";
-    return (
-      <Box>
-        <Text>Enter total hours for date "{selectedDate}":</Text>
-        <TextInput
-          value={parsedValue}
-          onChange={(input) => {
-            setTotalHours(input);
-          }}
-          onSubmit={() => {
-            const parsedValue = (totalHours && parseInt(totalHours)) || 0;
-            setSubmittedHours(parsedValue);
-          }}
         />
       </Box>
     );

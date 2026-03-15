@@ -5,12 +5,12 @@ import { initConfig } from "@saboit/toggl-redmine-bridge";
 
 export function validateAndAdjustRedmineUrl(
   url: string,
-  skipValidation: boolean = false
+  skipValidation: boolean = false,
 ): string {
   if (!skipValidation) {
     try {
       new URL(url);
-    } catch (e) {
+    } catch (_e) {
       console.error(`❌ Invalid URL format: ${url}`);
       console.error("🔍 Error details:", {
         url,
@@ -31,6 +31,10 @@ function createBasicAuth(username: string, password: string): string {
   return `Basic ${Buffer.from(authString).toString("base64")}`;
 }
 
+const removeTrailingSlash = (url: string): string => {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+};
+
 export function configure() {
   // Convert the URL to a file path and calculate the project root
   const __filename = fileURLToPath(import.meta.url);
@@ -43,11 +47,11 @@ export function configure() {
   initConfig({
     redmine: {
       baseUrl: validateAndAdjustRedmineUrl(process.env.REDMINE_API_URL!),
-      token: createBasicAuth(process.env.REDMINE_TOKEN!, "pass")
+      token: createBasicAuth(process.env.REDMINE_TOKEN!, "pass"),
     },
     toggl: {
-      baseUrl: process.env.TOGGL_API_URL!,
-      token: createBasicAuth(process.env.TOGGL_API_TOKEN!, "api_token")
-    }
+      baseUrl: removeTrailingSlash(process.env.TOGGL_API_URL!),
+      token: createBasicAuth(process.env.TOGGL_API_TOKEN!, "api_token"),
+    },
   });
 }

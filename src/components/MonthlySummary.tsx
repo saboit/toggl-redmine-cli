@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { useQuery } from "@tanstack/react-query";
-import { fetchUserTimeEntries } from "../lib/redmine.js";
+import { getTimeEntries } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { getDaysFromDate } from "../lib/helpers.js";
 
 const today = new Date();
@@ -13,19 +13,18 @@ export const MonthlySummary = () => {
   const { data = [], isLoading } = useQuery({
     queryKey: ["monthly-summary", month, year],
     queryFn: () => {
-      // Implement the monthly summary logic here
       return Promise.all(
         days.map(async (day) => {
           const date = new Date(year, month, day);
           const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
           date.setDate(date.getDate() + 1);
           const dateString = date.toISOString().split("T")[0];
-          const entries = await fetchUserTimeEntries(dateString);
-          const totalHours = entries.reduce(
+          const result = await getTimeEntries('json', { user_id: "me", spent_on: dateString });
+          const totalHours = result.time_entries.reduce(
             (acc, entry) => acc + entry.hours,
             0
           );
-          let isHoliday =
+          const isHoliday =
             dayName.toLowerCase() === "saturday" ||
             dayName.toLowerCase() === "sunday";
           const dayIcon = isHoliday ? "💤" : totalHours >= 7.5 ? "✔️" : "⚠️";

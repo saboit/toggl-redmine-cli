@@ -1,56 +1,80 @@
 import React from "react";
 import { CommandsProps } from "./types.js";
-import { fetchMyOpenIssues } from "../lib/redmine.js";
 import { createProjectsFromIssues as createTogglProjectsFromRedmineIssues, getRedmineToTogglMap } from "../lib/toggl.js";
 import { useQuery } from "@tanstack/react-query";
-import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { getIssues, IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
+import { Box, Text } from "ink";
 
-export const Projects = ({ args }: CommandsProps) => {
+interface SyncResult {
+  created: { togglId: number; issue: IssueSimple }[];
+  partialFailure: boolean;
+}
 
-  const togglWorkspaceStr = process.env.TOGGL_WORKSPACE_ID!;
-  const togglWorkspaceNum = Number.parseInt(togglWorkspaceStr, 10);
-  const redmineQueryIds = process.env.MYISSUES_QUERY_IDS!;
-  const redmineQueryIdsArray = redmineQueryIds.split(",").map((id) => Number.parseInt(id, 10));
+export const Projects = ({ args: _args }: CommandsProps) => {
+  const togglWorkspaceNum = Number.parseInt(process.env.TOGGL_WORKSPACE_ID!, 10);
+  const issuesQueryId = process.env.MYISSUES_QUERY_IDS;
+  const redmineQueryIdsArray = issuesQueryId
+    ?.split(",")
+    .map((id) => Number.parseInt(id, 10)) ?? [];
 
-  const { } = useQuery({
+  const { data, isLoading, isError, error } = useQuery<SyncResult | null>({
     queryKey: ["projects"],
+    enabled: !!issuesQueryId,
     queryFn: async () => {
-
       const mappingCache = await getRedmineToTogglMap(togglWorkspaceNum);
-      let redmineIssues: IssueSimple[] = [];
+      const seenIds = new Set<number>();
+      const redmineIssues: IssueSimple[] = [];
+
       for (const redmineQueryId of redmineQueryIdsArray) {
-        const rmQueryIssues = await fetchMyOpenIssues(redmineQueryId);
-        console.log(`Fetched ${rmQueryIssues.length} issues from Redmine query ID: ${redmineQueryId}`);
-        for(const rmIssue of rmQueryIssues) {
-          if(redmineIssues.map(i => i.id).includes(rmIssue.id)) {
-            console.log(`Issue ID ${rmIssue.id} is already created from different query, skipping`);
-          } else {
-            // Check if the issue is already mapped to a Toggl project
-            const togglProjectId = mappingCache[rmIssue.id];
-            if (togglProjectId) {
-              console.log(`RM ID ${rmIssue.id} is already mapped to Toggl project ID ${togglProjectId}, skipping`);
-            } else {
-              console.log(`Adding RM ID ${rmIssue.id} to the list for Toggl project creation`);
-              redmineIssues.push(rmIssue);
-            }
+        const result = await getIssues('json', { query_id: redmineQueryId });
+        for (const rmIssue of result.issues) {
+          if (!seenIds.has(rmIssue.id) && !mappingCache[rmIssue.id]) {
+            seenIds.add(rmIssue.id);
+            redmineIssues.push(rmIssue);
           }
         }
       }
-      if(redmineIssues.length === 0) {
-        console.log("No new Redmine issues found for Toggl project creation.");
-        return;
+
+      if (redmineIssues.length === 0) {
+        return null;
       }
+
       const togglIds = await createTogglProjectsFromRedmineIssues(togglWorkspaceNum, redmineIssues);
-      if(togglIds.length !== redmineIssues.length) {
-        console.error(`Error: ${redmineIssues.length} RM issues requested, but ${togglIds.length} Toggl projects created. Toggl API rate limit may be exceeded, try again next hour.`);
-      }
-      togglIds.forEach((togglId, index) => {
-        mappingCache[redmineIssues[index].id] = togglId;
-      });
-      return togglIds;
+      return {
+        created: togglIds.map((togglId, i) => ({ togglId, issue: redmineIssues[i] })),
+        partialFailure: togglIds.length !== redmineIssues.length,
+      };
     },
-    refetchOnWindowFocus: false
+    refetchOnWindowFocus: false,
   });
 
-  return <div />;
+  if (!issuesQueryId) {
+    return <Text color="red">Error: MYISSUES_QUERY_IDS environment variable is not set</Text>;
+  }
+
+  if (isLoading) {
+    return <Text>Syncing Redmine issues to Toggl projects...</Text>;
+  }
+
+  if (isError) {
+    return <Text color="red">Error: {(error as Error).message}</Text>;
+  }
+
+  if (!data) {
+    return <Text color="yellow">No new Redmine issues to sync.</Text>;
+  }
+
+  return (
+    <Box flexDirection="column">
+      <Text color="green">Created {data.created.length} Toggl project(s):</Text>
+      {data.created.map(({ togglId, issue }) => (
+        <Text key={issue.id}>{`  #${issue.id} ${issue.subject} → Toggl ${togglId}`}</Text>
+      ))}
+      {data.partialFailure && (
+        <Text color="red">
+          Warning: not all projects were created. Toggl API rate limit may be exceeded, try again next hour.
+        </Text>
+      )}
+    </Box>
+  );
 };

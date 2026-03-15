@@ -1,8 +1,8 @@
 import { getActivityId } from "./activities.js";
-import { ModelsTimeEntry as TogglTimeEntry } from "@saboit/toggl-redmine-bridge/api-toggl";
-import { createTimeEntry, getProjects, getTimeEntries, TimeEntry as RedmineTimeEntry, deleteTimeEntry as redmineDeleteTimeEntry, search, Search } from "@saboit/toggl-redmine-bridge/api-redmine";
-import { getIssues, IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
-import { redmineClient } from "@saboit/toggl-redmine-bridge";
+import { ModelsTimeEntry as TogglTimeEntry } from "@saboit/toggl-redmine-bridge/api-toggl-hooks";
+import {
+  getProjects,
+} from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 
 // Redmine un-official OpenAPI does define the TimeEntry model but it is used only for responses (?)
 // And the call `createTimeEntry` parameter defines slightly different structure (inline, anonymous)
@@ -30,47 +30,45 @@ async function fetchAllProjects(): Promise<Project[]> {
 
   while (true) {
     try {
-      const response = await getProjects({
-        client: redmineClient,
-        path: { format: "json" },
-        query: { limit, offset }
-      })
-      if(response.error) {
-        throw new Error(`HTTP error: ${response.error}`);
-      }
-
-      const projects: Project[] = response.data!.projects
+      const result = await getProjects('json', { limit, offset });
+      const projects: Project[] = result.projects;
 
       if (projects.length === 0) {
-        // No more projects to fetch
         break;
       }
 
       allProjects = allProjects.concat(projects);
-
-      // Update offset for the next batch
       offset += limit;
 
-      // Check if we've fetched all projects
-      if (allProjects.length >= response.data!.total_count!) {
-        // All projects fetched
+      if (allProjects.length >= result.total_count!) {
         break;
       }
     } catch (error: any) {
       console.error("Failed to fetch projects from Redmine:", error.message);
-      console.error("🔍 Error details:", {
-        redmineClient,
-        offset,
-        limit
-      });
+      console.error("🔍 Error details:", { offset, limit });
       throw error;
     }
   }
   return allProjects;
 }
 
+const JIRA_KEY_RE = /\b([A-Z]+-\d+)\b/;
+
+function extractJiraKey(description: string): string | null {
+  const match = description.match(JIRA_KEY_RE);
+  return match ? match[1] : null;
+}
+
+function getOrphanEntries(entries: TogglTimeEntry[]): TogglTimeEntry[] {
+  return entries.filter((entry) => {
+    const description = entry.description || "";
+    const projectName = entry.project_name || "";
+    return !/#\d+/.test(description) && !/#\d+/.test(projectName);
+  });
+}
+
 const LOG_PRECISELY = "lp";
-let isEntryLoggedPrecisely: (entry: TogglTimeEntry) => boolean = (entry) => {
+const isEntryLoggedPrecisely: (entry: TogglTimeEntry) => boolean = (entry) => {
   return (
     entry.description!.includes(`@${LOG_PRECISELY}`) ||
     entry.tags!.includes(LOG_PRECISELY)
@@ -79,7 +77,8 @@ let isEntryLoggedPrecisely: (entry: TogglTimeEntry) => boolean = (entry) => {
 
 function prepareRedmineEntries(
   togglEntries: TogglTimeEntry[],
-  requiredHoursCap: number
+  requiredHoursCap: number,
+  resolvedIssueIds?: Map<number, number>
 ): RedmineEntry[] {
   const adjustCoefficient =
     requiredHoursCap == 0
@@ -104,7 +103,7 @@ function prepareRedmineEntries(
           );
         })();
 
-  let redmineEntries: RedmineEntry[] = [];
+  const redmineEntries: RedmineEntry[] = [];
 
   togglEntries.sort((a, b) => {
     return new Date(a.start!).getTime() - new Date(b.start!).getTime();
@@ -114,14 +113,18 @@ function prepareRedmineEntries(
     const durationSeconds = entry.duration!;
     const spentOn = entry.start!.substring(0, 10);
 
-    const issueIdMatch = description.match(/#(\d+)/);
     let issueId: string | null = null;
-    if (issueIdMatch) {
-      issueId = issueIdMatch[1];
+    if (resolvedIssueIds?.has(entry.id!)) {
+      issueId = String(resolvedIssueIds.get(entry.id!)!);
     } else {
-      const projectMatch = projectName.match(/#(\d+)/);
-      if (projectMatch) {
-        issueId = projectMatch[1];
+      const issueIdMatch = description.match(/#(\d+)/);
+      if (issueIdMatch) {
+        issueId = issueIdMatch[1];
+      } else {
+        const projectMatch = projectName.match(/#(\d+)/);
+        if (projectMatch) {
+          issueId = projectMatch[1];
+        }
       }
     }
 
@@ -152,95 +155,9 @@ function prepareRedmineEntries(
   return redmineEntries;
 }
 
-async function trackTimeInRedmine(
-  redmineEntries: RedmineEntry[]
-): Promise<RedmineTimeEntry[]> {
-  let createdEntries: RedmineTimeEntry[] = [];
-  for (const entry of redmineEntries) {
-    const response = await createTimeEntry({
-      client: redmineClient,
-      path: { format: "json" },
-      body: entry
-    })
-    if(response.error) {
-      const errorMessage = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${JSON.stringify(response.error)}`;
-      console.log(errorMessage);
-      throw new Error(errorMessage);
-    } else {
-      const createdEntry = response.data!.time_entry;
-      createdEntries.push(createdEntry);
-      const successMessage = `Redmine entry "${createdEntry.id} ${createdEntry.comments}" CREATED ${createdEntry.issue?.id}`;
-      console.log(successMessage);
-    }
-  }
-  return createdEntries;
-}
-
-// Function to search issues using the standard Redmine API
-async function searchIssues(
-  searchQuery: string
-): Promise<Search[]> {
-  const response = await search({
-    client: redmineClient,
-    path: { format: "json" },
-    query: { offset: 0, limit: 20, q: searchQuery }
-  })
-  if(response.error) {
-    throw new Error(`HTTP error: ${response.error}`);
-  }
-  return response.data!.results;
-}
-
-// Function to fetch the user's tracked time entries from Redmine
-async function fetchUserTimeEntries(
-  date: string
-): Promise<RedmineTimeEntry[]> {
-
-  const response = await getTimeEntries({
-    client: redmineClient,
-    path: { format: "json" },
-    query: { user_id: ["me"], spent_on: date },
-
-  });
-  if(response.error) {
-    throw new Error(`HTTP error: ${response.error}`);
-  }
-  return response.data!.time_entries;
-}
-
-// Function to delete a time entry from Redmine
-async function deleteTimeEntry(
-  entryId: number
-): Promise<void> {
-
-  const response = await redmineDeleteTimeEntry({
-    client: redmineClient,
-    path: { format: "json", time_entry_id: entryId }
-  });
-  if(response.error) {
-    throw new Error(`HTTP error: ${response.error}`);
-  }
-  // deleteTimeEntry response.data is void 
-}
-
-async function getIssuesFromQuery(queryId: number): Promise<IssueSimple[]> {
-  const queryResponse = await getIssues({
-    client: redmineClient,
-    path: { format: "json" },
-    query: { query_id: queryId }
-  });
-  if(queryResponse.error) {
-    throw new Error(`HTTP error: ${queryResponse.error}`);
-  }
-  return queryResponse.data!.issues;
-}
-
 export {
   fetchAllProjects,
-  trackTimeInRedmine,
-  searchIssues,
   prepareRedmineEntries,
-  fetchUserTimeEntries,
-  deleteTimeEntry,
-  getIssuesFromQuery as fetchMyOpenIssues
+  getOrphanEntries,
+  extractJiraKey,
 };
