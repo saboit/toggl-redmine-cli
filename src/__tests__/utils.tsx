@@ -15,8 +15,13 @@ export function renderWithQuery(element: React.ReactElement) {
 }
 
 export async function flushEffects() {
-  // React effects are scheduled via MessageChannel (faster than setTimeout).
-  // One setTimeout(0) tick is enough to let all pending effects commit.
+  // React 18 passive effects (useEffect) are scheduled via MessageChannel
+  // which fires before setTimeout in browsers, but in Node.js the ordering
+  // is not guaranteed within a single setTimeout(0) tick. Two ticks ensure
+  // that both the render commit and the effect re-registration (which
+  // ink-text-input relies on to update its onSubmit handler) have completed
+  // before the next stdin input is processed.
+  await new Promise((r) => setTimeout(r, 0));
   await new Promise((r) => setTimeout(r, 0));
 }
 

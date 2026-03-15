@@ -11,13 +11,16 @@ const defaultSearchResults = [
   { id: 67890, title: "Fix dashboard layout" },
 ];
 
+const today = new Date().toISOString().split("T")[0];
+
 const defaultTogglEntries = [
   {
     id: 1,
     description: "Fix auth bug",
     duration: 7200,
-    start: "2024-01-15T09:00:00+00:00",
+    start: `${today}T09:00:00+00:00`,
     project_id: 999,
+    project_name: "#12345 Fix auth bug ProjectName",
     tags: ["dev"],
   },
 ];
@@ -25,12 +28,12 @@ const defaultTogglEntries = [
 const defaultTogglProjects = [{ id: 999, name: "#12345 Fix auth bug ProjectName" }];
 
 export const mockRedmineEntries = (entries = defaultRedmineEntries) =>
-  http.get(`${REDMINE_BASE_URL}time_entries.json`, () =>
+  http.get(`${REDMINE_BASE_URL}/time_entries.json`, () =>
     HttpResponse.json({ time_entries: entries, total_count: entries.length })
   );
 
 export const mockRedmineSearch = (results = defaultSearchResults) =>
-  http.get(`${REDMINE_BASE_URL}search.json`, () =>
+  http.get(`${REDMINE_BASE_URL}/search.json`, () =>
     HttpResponse.json({ results })
   );
 
@@ -45,7 +48,7 @@ export const mockTogglProjects = (projects = defaultTogglProjects) =>
   );
 
 export const mockRedmineCreateEntry = () =>
-  http.post(`${REDMINE_BASE_URL}time_entries.json`, () =>
+  http.post(`${REDMINE_BASE_URL}/time_entries.json`, () =>
     HttpResponse.json({
       time_entry: { id: 100, issue: { id: 12345 }, comments: "Fix auth bug", hours: 2.0 },
     })
@@ -57,12 +60,12 @@ const defaultRedmineProjects = [
 ];
 
 export const mockRedmineProjects = (projects = defaultRedmineProjects) =>
-  http.get(`${REDMINE_BASE_URL}projects.json`, () =>
+  http.get(`${REDMINE_BASE_URL}/projects.json`, () =>
     HttpResponse.json({ projects, total_count: projects.length })
   );
 
 export const mockRedmineCreateIssue = (issue = { id: 5001, subject: "[PROJ-123] Fix authentication bug" }) =>
-  http.post(`${REDMINE_BASE_URL}issues.json`, () =>
+  http.post(`${REDMINE_BASE_URL}/issues.json`, () =>
     HttpResponse.json({ issue })
   );
 

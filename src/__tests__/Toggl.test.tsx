@@ -11,9 +11,10 @@ describe("Toggl", () => {
     expect(lastFrame()).toContain("Select a date:");
   });
 
-  it("shows hours input when only date arg is provided", () => {
+  it("shows tracking confirmation when only date arg is provided", () => {
     const { lastFrame } = renderWithQuery(<Toggl args={["0"]} />);
-    expect(lastFrame()).toContain("Enter total hours");
+    expect(lastFrame()).toContain("Track");
+    expect(lastFrame()).toContain("hours for date");
   });
 
   it("shows tracking confirmation with correct hours", () => {
