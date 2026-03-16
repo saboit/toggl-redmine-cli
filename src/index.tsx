@@ -16,6 +16,7 @@ import { Projects } from "./components/Projects.js";
 import { ImportJiraIssue } from "./components/ImportJiraIssue.js";
 import BigText from "ink-big-text";
 import fs from "fs";
+import { BUILD_DATE } from "./buildInfo.js";
 
 configure();
 
@@ -53,6 +54,7 @@ const App = () => {
     return (
       <Box flexDirection="column">
         <BigText text={`Toggl Redmine CLI v${version}`} />
+        <Text dimColor>Built: {BUILD_DATE}</Text>
         <Text color="green">Select a command:</Text>
         <SelectInput
           items={options}
