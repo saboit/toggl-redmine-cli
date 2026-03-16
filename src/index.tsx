@@ -15,7 +15,6 @@ import SelectInput from "ink-select-input";
 import { Projects } from "./components/Projects.js";
 import { ImportJiraIssue } from "./components/ImportJiraIssue.js";
 import BigText from "ink-big-text";
-import fs from "fs";
 import { BUILD_DATE } from "./buildInfo.js";
 
 configure();
@@ -35,10 +34,6 @@ const OutputMap: Record<string, (props: CommandsProps) => JSX.Element> = {
 
 const InvalidCommand = () => <Text>Invalid command</Text>;
 
-const packageJson = JSON.parse(fs.readFileSync(new URL("../package.json", import.meta.url), "utf-8"));
-
-const version = packageJson.version;
-
 const App = () => {
   const [command, ...args] = process.argv.slice(2);
   const [selectedCommand, setCommand] = useState(command);
@@ -53,7 +48,7 @@ const App = () => {
     });
     return (
       <Box flexDirection="column">
-        <BigText text={`Toggl Redmine CLI v${version}`} />
+        <BigText text='Toggl Redmine CLI' />
         <Text dimColor>Built: {BUILD_DATE}</Text>
         <Text color="green">Select a command:</Text>
         <SelectInput
