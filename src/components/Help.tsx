@@ -1,5 +1,5 @@
+import React from "react";
 import { Box, Text } from "ink";
-import React, { useState, useEffect } from "react";
 
 export const Help = () => {
   return (

@@ -41,7 +41,7 @@ describe("ImportJiraIssue", () => {
       stdin.write("PROJ-123");
       await flushEffects();
       stdin.write("\r");
-      await waitForFrame(frames, "Fetching PROJ-123");
+      await waitForFrame(frames, "Select Redmine project");
     });
 
     it("accepts comma-separated keys", async () => {

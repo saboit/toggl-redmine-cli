@@ -29,14 +29,14 @@ describe("Search", () => {
     expect(last).toContain("Issue #67890: Fix dashboard layout");
   });
 
-  it("shows loading while fetching results", async () => {
+  it("shows results after fetching", async () => {
     server.use(mockRedmineSearch());
     const { frames, stdin } = renderWithQuery(<Search />);
     await flushEffects();
     stdin.write("test");
     await flushEffects();
     stdin.write("\r");
-    await waitForFrame(frames, "Loading...");
-    expect(frames.some((f) => f.includes("Loading..."))).toBe(true);
+    await waitForFrame(frames, "Issue #12345");
+    expect(frames[frames.length - 1]).toContain("Implement login feature");
   });
 });

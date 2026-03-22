@@ -1,20 +1,15 @@
 import React, { useState } from "react";
 import { Box, Text } from "ink";
-import { useQuery } from "@tanstack/react-query";
-import { searchIssues } from "../lib/redmine.js";
+import { useGetSearch, Search as SearchResult } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import TextInput from "ink-text-input";
 
 export const Search = () => {
   const [currentValue, setCurrentValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["search", searchQuery],
-    queryFn: () => {
-      // Implement the search logic here
-      return searchIssues(searchQuery);
-    },
-    enabled: searchQuery.length > 0,
+  const { data, isLoading } = useGetSearch('json', { q: searchQuery, offset: 0, limit: 20 }, {
+    query: { enabled: searchQuery.length > 0 },
   });
+  const results: SearchResult[] = data?.results ?? [];
 
   const handleChange = (value: string) => {
     setCurrentValue(value);
@@ -24,7 +19,7 @@ export const Search = () => {
     <Box flexDirection="column">
       <Box flexDirection="column" marginTop={1}>
         {isLoading && <Text>Loading...</Text>}
-        {data.map((issue, idx) => {
+        {results.map((issue, idx) => {
           return (
             <Text
               key={`${issue.id}-${idx}`}

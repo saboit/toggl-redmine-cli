@@ -4,8 +4,7 @@ import {
   ModelsTimeEntry,
   postWorkspaceProjectCreate,
 } from "@saboit/toggl-redmine-bridge/api-toggl";
-import { togglClient } from "@saboit/toggl-redmine-bridge";
-import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 
 export async function fetchTogglTimeEntries(
   date: string,
@@ -21,11 +20,6 @@ export async function fetchTogglTimeEntries(
       ? "-"
       : "+" + `00${Math.abs(localMachineTZOffsetMinutes / 60)}`.slice(-2);
 
-  // const preferencesResponse = await getPreferences({
-  //   client
-  // });
-  // preferencesResponse.data!.pg_time_zone_name;
-
   const params = {
     start_date: `${date}T00:00:00${tzOffsetHrsFormatted}:00`,
     end_date: `${date}T23:59:59${tzOffsetHrsFormatted}:00`,
@@ -33,29 +27,26 @@ export async function fetchTogglTimeEntries(
   };
 
   console.log("🔍 Fetching Toggl time entries with params:", params);
-  const response = await getMyTimeEntries({
-    query: {
-      ...params,
-      meta: false,
-      include_sharing: false,
-    },
-  });
-  if (response.error) {
-    console.error("❌ Failed to fetch Toggl time entries:", response.error);
-    console.error("🔍 Error details:", {
-      client: togglClient.getConfig().baseUrl,
-      params,
-      headers: togglClient.getConfig().headers,
+  try {
+    // Note: start_date/end_date/workspace_id are passed as query params (params arg)
+    // since the orval-generated body for GET requests is not sent over the wire.
+    const { data = [] } = await getMyTimeEntries({
+      query: {
+        ...params,
+        meta: false,
+        include_sharing: false,
+      },
     });
-    process.exit(1);
-  } else {
-    return response.data!.map((entry) => ({
+    return data.map((entry) => ({
       ...entry,
       start: new Date(
         new Date(entry.start!).getTime() +
           localMachineTZOffsetMinutes * 60 * 1000,
       ).toISOString(),
     }));
+  } catch (error: any) {
+    console.error("❌ Failed to fetch Toggl time entries:", error.message);
+    process.exit(1);
   }
 }
 
@@ -87,9 +78,9 @@ export async function createProjectsFromIssues(
   }
   const togglProjectNames = issues.map(
     (issue) =>
-      `#${issue.id} ${ellipsis(issue.subject, 40)} ${issue.project.name}`,
+      `#${issue.id} ${ellipsis(issue.subject, 40)} ${issue.project?.name}`,
   );
-  let ids: number[] = [];
+  const ids: number[] = [];
   for (const name of togglProjectNames) {
     try {
       const id = await createProject(name);
@@ -122,7 +113,7 @@ export async function getTogglProjects(
   if (response.error) {
     throw new Error(`HTTP error: ${response.error}`);
   }
-  let retval: TogglProject[] = [];
+  const retval: TogglProject[] = [];
   response.data!.forEach((project) => {
     // The declared type is ModelsProject which declares property "client_name"
     // But the returned type has property "name".
@@ -153,7 +144,7 @@ export async function getRedmineToTogglMap(
   togglWorkspaceId: number,
 ): Promise<RedmineToTogglMap> {
   const togglProjects = await getTogglProjects(togglWorkspaceId);
-  let map: RedmineToTogglMap = {};
+  const map: RedmineToTogglMap = {};
   togglProjects.forEach((togglProject) => {
     map[togglProject.redmineId] = togglProject.togglId;
   });

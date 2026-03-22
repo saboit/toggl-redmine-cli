@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     environment: "node",
     setupFiles: ["./src/__tests__/setup.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/build/**"],
   },
   esbuild: {
     jsx: "transform",

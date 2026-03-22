@@ -1,19 +1,17 @@
 import React from "react";
 import { getDateString } from "../lib/helpers.js";
-import { fetchUserTimeEntries } from "../lib/redmine.js";
 import { Box, Text } from "ink";
-import { useQuery } from "@tanstack/react-query";
+import { useGetTimeEntries, TimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { CommandsProps } from "./types.js";
 
 export const Entries = ({ args }: CommandsProps) => {
   const [arg1] = args ?? [];
   const daysAgo = arg1 ? parseInt(arg1) : 0;
   const date = getDateString(daysAgo);
-  const { data: entries = [], isLoading } = useQuery({
-    queryKey: ["entries", date],
-    queryFn: () => fetchUserTimeEntries(date),
-    refetchOnWindowFocus: false,
+  const { data, isLoading } = useGetTimeEntries('json', { user_id: "me", spent_on: date }, {
+    query: { queryKey: ["entries", date], refetchOnWindowFocus: false },
   });
+  const entries: TimeEntry[] = data?.time_entries ?? [];
 
   if (isLoading) {
     return <Text>Loading...</Text>;

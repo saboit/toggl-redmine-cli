@@ -5,8 +5,11 @@ import TextInput from "ink-text-input";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CommandsProps } from "./types.js";
 import { fetchJiraIssue, JiraIssue } from "../lib/jira.js";
-import { fetchAllProjects, searchIssues, createRedmineIssue } from "../lib/redmine.js";
+import { fetchAllProjects } from "../lib/redmine.js";
+import { getSearch, createIssue } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { ConfirmInput } from "./ConfirmInput.js";
+import { useEventCallback } from "../lib/hooks.js";
+
 
 interface LoadedData {
   jiraIssue: JiraIssue;
@@ -14,18 +17,26 @@ interface LoadedData {
   existingRedmineId: number | null;
 }
 
-const JiraIssueImporter = ({ jiraKey, onDone }: { jiraKey: string; onDone: () => void }) => {
+export const JiraIssueImporter = ({
+  jiraKey,
+  onDone,
+  onSkip,
+}: {
+  jiraKey: string;
+  onDone: (issueId: number) => void;
+  onSkip?: () => void;
+}) => {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
 
   const { data, isLoading, isError, error } = useQuery<LoadedData>({
     queryKey: ["jira-import", jiraKey],
     queryFn: async () => {
-      const [jiraIssue, redmineProjects, searchResults] = await Promise.all([
+      const [jiraIssue, redmineProjects, searchData] = await Promise.all([
         fetchJiraIssue(jiraKey),
         fetchAllProjects(),
-        searchIssues(jiraKey),
+        getSearch('json', { q: jiraKey, offset: 0, limit: 20 }),
       ]);
-      const existing = searchResults.find((r) => r.title.includes(jiraKey));
+      const existing = searchData.results.find((r) => r.title.includes(jiraKey));
       return {
         jiraIssue,
         redmineProjects,
@@ -35,33 +46,52 @@ const JiraIssueImporter = ({ jiraKey, onDone }: { jiraKey: string; onDone: () =>
   });
 
   const { mutate, isPending, isSuccess, isError: isMutationError, error: mutationError, data: created } = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const project = data!.redmineProjects.find((p) => p.id === selectedProjectId)!;
       const { summary } = data!.jiraIssue.fields;
-      return createRedmineIssue(
-        project.id,
-        `[${jiraKey}] ${summary}`,
-        `Imported from Jira: ${jiraKey}`
-      );
+      const result = await createIssue('json', {
+        issue: {
+          project_id: project.id,
+          subject: `[${jiraKey}] ${summary}`,
+          description: `Imported from Jira: ${jiraKey}`,
+        },
+      });
+      return result.issue as { id: number; subject: string };
     },
   });
+
+  const doneEvent = useEventCallback((id: number) => {
+    onDone(id);
+  })
+
+  const redmineExistingId = data?.existingRedmineId;
 
   // Both must be before any early returns to satisfy Rules of Hooks.
   // useEffect ensures the frame renders first before onDone() advances the parent.
   useEffect(() => {
-    if (data?.existingRedmineId) onDone();
-  }, [data?.existingRedmineId]);
+    if (redmineExistingId) doneEvent(redmineExistingId);
+  }, [redmineExistingId, doneEvent]);
 
   useEffect(() => {
-    if (isSuccess) onDone();
-  }, [isSuccess]);
+    if (isSuccess) doneEvent(created!.id);
+  }, [created, doneEvent, isSuccess]);
 
   if (isLoading) {
     return <Text>Fetching {jiraKey}...</Text>;
   }
 
   if (isError) {
-    return <Text color="red">Error: {(error as Error).message}</Text>;
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error: {(error as Error).message}</Text>
+        {onSkip && (
+          <Box flexDirection="column">
+            <Text>Skip this entry? (y/n)</Text>
+            <ConfirmInput onPress={(confirmed) => { if (confirmed) onSkip(); }} />
+          </Box>
+        )}
+      </Box>
+    );
   }
 
   const { jiraIssue, redmineProjects, existingRedmineId } = data!;

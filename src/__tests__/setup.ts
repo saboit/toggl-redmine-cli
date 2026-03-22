@@ -3,7 +3,7 @@ import { initConfig } from "@saboit/toggl-redmine-bridge";
 import { beforeAll, afterEach, afterAll } from "vitest";
 
 export const TOGGL_BASE_URL = "http://toggl.test/api/v9";
-export const REDMINE_BASE_URL = "http://redmine.test/";
+export const REDMINE_BASE_URL = "http://redmine.test";
 export const JIRA_BASE_URL = "http://jira.test";
 
 process.env.TOGGL_WORKSPACE_ID = "123";

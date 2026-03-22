@@ -1,7 +1,3 @@
-const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
-
-const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
-
 interface JiraIssueFields {
   summary: string;
   description: string | null;
@@ -27,6 +23,9 @@ export interface JiraIssue {
 }
 
 export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
+  const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
+  const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
+
   const response = await fetch(`${JIRA_API_URL}/rest/api/3/issue/${key}`, {
     headers: {
       Authorization: `Bearer ${JIRA_API_KEY}`,
@@ -41,6 +40,8 @@ export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
 };
 
 export const getIssuesFromJiraQuery = async (query: string) => {
+  const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
+  const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
   const response = await fetch(
     `${JIRA_API_URL}/search?jql=${encodeURIComponent(query)}`,
     {

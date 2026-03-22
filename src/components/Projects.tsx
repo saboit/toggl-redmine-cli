@@ -1,9 +1,8 @@
 import React from "react";
 import { CommandsProps } from "./types.js";
-import { fetchMyOpenIssues } from "../lib/redmine.js";
 import { createProjectsFromIssues as createTogglProjectsFromRedmineIssues, getRedmineToTogglMap } from "../lib/toggl.js";
 import { useQuery } from "@tanstack/react-query";
-import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { getIssues, IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { Box, Text } from "ink";
 
 interface SyncResult {
@@ -11,26 +10,24 @@ interface SyncResult {
   partialFailure: boolean;
 }
 
-export const Projects = ({ args }: CommandsProps) => {
+export const Projects = ({ args: _args }: CommandsProps) => {
   const togglWorkspaceNum = Number.parseInt(process.env.TOGGL_WORKSPACE_ID!, 10);
   const issuesQueryId = process.env.MYISSUES_QUERY_IDS;
-  if (!issuesQueryId) {
-    return <Text color="red">Error: MYISSUES_QUERY_IDS environment variable is not set</Text>;
-  }
   const redmineQueryIdsArray = issuesQueryId
-    .split(",")
-    .map((id) => Number.parseInt(id, 10));
+    ?.split(",")
+    .map((id) => Number.parseInt(id, 10)) ?? [];
 
   const { data, isLoading, isError, error } = useQuery<SyncResult | null>({
     queryKey: ["projects"],
+    enabled: !!issuesQueryId,
     queryFn: async () => {
       const mappingCache = await getRedmineToTogglMap(togglWorkspaceNum);
       const seenIds = new Set<number>();
       const redmineIssues: IssueSimple[] = [];
 
       for (const redmineQueryId of redmineQueryIdsArray) {
-        const rmQueryIssues = await fetchMyOpenIssues(redmineQueryId);
-        for (const rmIssue of rmQueryIssues) {
+        const result = await getIssues('json', { query_id: redmineQueryId });
+        for (const rmIssue of result.issues) {
           if (!seenIds.has(rmIssue.id) && !mappingCache[rmIssue.id]) {
             seenIds.add(rmIssue.id);
             redmineIssues.push(rmIssue);
@@ -50,6 +47,10 @@ export const Projects = ({ args }: CommandsProps) => {
     },
     refetchOnWindowFocus: false,
   });
+
+  if (!issuesQueryId) {
+    return <Text color="red">Error: MYISSUES_QUERY_IDS environment variable is not set</Text>;
+  }
 
   if (isLoading) {
     return <Text>Syncing Redmine issues to Toggl projects...</Text>;
