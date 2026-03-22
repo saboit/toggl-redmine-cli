@@ -26,7 +26,7 @@ export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
   const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
   const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
 
-  const response = await fetch(`${JIRA_API_URL}/rest/api/3/issue/${key}`, {
+  const response = await fetch(`${JIRA_API_URL}/jira/rest/api/2/issue/${key}`, {
     headers: {
       Authorization: `Bearer ${JIRA_API_KEY}`,
       "Content-Type": "application/json",
