@@ -9,7 +9,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node dist/index.js",
-    "prebuild": "echo \"export const BUILD_DATE = '$(date -u +%Y-%m-%dT%H:%M:%SZ)';\" > src/buildInfo.ts",
+    "prebuild": "node scripts/generate-build-info.mjs",
     "build": "tsc"
   },
   "engines": {

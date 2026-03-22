@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useId, useMemo, useState } from "react";
 import { CommandsProps } from "./types.js";
 import {
   getDateString,
@@ -12,6 +12,7 @@ import SelectInput from "ink-select-input";
 import { createTimeEntry, } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { useGetMyTimeEntries } from "@saboit/toggl-redmine-bridge/api-toggl-hooks";
 import { OrphanEntryResolver } from "./OrphanEntryResolver.js";
+import { TimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine";
 
 const today = new Date();
 const year = today.getFullYear();
@@ -25,7 +26,6 @@ const TogglInternal = ({
   date: string;
   totalHours?: number;
 }) => {
-  const { exit } = useApp();
   const [orphansResolved, setOrphansResolved] = useState(false);
   const [shouldTrackRedmine, setShouldTrackRedmine] = useState(false);
   const [resolvedIssueIds, setResolvedIssueIds] = useState<Map<number, number>>(new Map());
@@ -43,22 +43,28 @@ const TogglInternal = ({
     [timeEntriesForDate, totalHours, resolvedIssueIds]
   );
 
-  const { mutate, isSuccess, isPending } = useMutation({
+  const { mutate, isSuccess, isPending, data: submittedEntries, isError } = useMutation({
     mutationKey: ["track", date],
     mutationFn: async () => {
+      const createdEntries: TimeEntry[] = [];
+      const failedEntries: string[] = [];
       for (const entry of entries) {
         try {
           const result = await createTimeEntry('json', entry as any);
           const created = result.time_entry;
-          console.log(`Redmine entry "${created.id} ${created.comments}" CREATED ${created.issue?.id}`);
+          createdEntries.push(created as TimeEntry);
         } catch (error: any) {
           const msg = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${error.message}`;
-          console.log(msg);
+          failedEntries.push(msg);
           throw error;
         }
       }
+      return { createdEntries, failedEntries };
     },
   });
+
+
+  const { createdEntries, failedEntries } = submittedEntries ?? {};
 
   if (isLoading) {
     return <Text>Loading...</Text>;
@@ -80,6 +86,34 @@ const TogglInternal = ({
     return (
       <Text color="red">No time entries found for the selected date.</Text>
     );
+  }
+
+  if (isPending) {
+    return <Text>Tracking time entries...</Text>;
+  }
+
+  if (isSuccess || isError) {
+    return (
+      <Box flexDirection="column">
+        <Text>Time entries tracked successfully!</Text>
+        {createdEntries && createdEntries.length > 0 && (
+          <Box flexDirection="column">
+            <Text>Created entries:</Text>
+            {createdEntries.map((entry, idx) => (
+              <Text key={idx}>{`- Issue #${entry.issue?.id}: ${entry.hours}h - ${entry.comments}`}</Text>
+            ))}
+          </Box>
+        )}
+        {failedEntries && failedEntries.length > 0 && (
+          <Box flexDirection="column">
+            <Text color="red">Failed to track the following entries:</Text>
+            {failedEntries.map((msg, idx) => (
+              <Text key={idx} color="red">{`- ${msg}`}</Text>
+            ))}
+          </Box>
+        )}
+      </Box>
+    )
   }
 
   const hoursToReport = totalHours ?? entries.reduce((sum, entry) => sum + (entry.time_entry.hours || 0), 0);
@@ -108,14 +142,13 @@ const TogglInternal = ({
                 setShouldTrackRedmine(checked);
                 mutate();
               } else {
-                exit();
+                console.log("Aborting time tracking.");
+                setShouldTrackRedmine(false);
               }
             }}
           />
         </Box>
       )}
-      {isPending && <Text>Tracking time entries...</Text>}
-      {isSuccess && <Text>Time entries tracked successfully!</Text>}
     </Box>
   );
 };
@@ -143,10 +176,6 @@ export const Toggl = ({ args }: CommandsProps) => {
     return getDateString(daysAgo);
   });
 
-  const [totalHours, _setTotalHours] = useState(arg2);
-  const [shouldTrack, setShouldTrack] = useState(false);
-  const { exit } = useApp();
-
   const parsedValue = parseInt(arg2);
   const submittedHours = isNaN(parsedValue) ? undefined : parsedValue;
 
@@ -158,25 +187,6 @@ export const Toggl = ({ args }: CommandsProps) => {
           items={options}
           limit={10}
           onSelect={(item) => setSelectedDate(item.value)}
-        />
-      </Box>
-    );
-  }
-
-  if (!shouldTrack) {
-    return (
-      <Box>
-        <Text>
-          Track {totalHours} hours for date "{selectedDate}"? (y/n)
-        </Text>
-        <ConfirmInput
-          onPress={(checked) => {
-            if (!checked) {
-              exit();
-              return;
-            }
-            setShouldTrack(checked);
-          }}
         />
       </Box>
     );

@@ -9,7 +9,7 @@ export const Entries = ({ args }: CommandsProps) => {
   const daysAgo = arg1 ? parseInt(arg1) : 0;
   const date = getDateString(daysAgo);
   const { data, isLoading } = useGetTimeEntries('json', { user_id: "me", spent_on: date }, {
-    query: { queryKey: ["entries", date], refetchOnWindowFocus: false },
+    query: { queryKey: ["entries", date] },
   });
   const entries: TimeEntry[] = data?.time_entries ?? [];
 
