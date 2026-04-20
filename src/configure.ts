@@ -10,7 +10,7 @@ export function validateAndAdjustRedmineUrl(
   if (!skipValidation) {
     try {
       new URL(url);
-    } catch (_e) {
+    } catch (e) {
       console.error(`❌ Invalid URL format: ${url}`);
       console.error("🔍 Error details:", {
         url,
@@ -35,6 +35,45 @@ const removeTrailingSlash = (url: string): string => {
   return url.endsWith("/") ? url.slice(0, -1) : url;
 };
 
+interface EnvVars {
+  REDMINE_API_URL: string;
+  REDMINE_TOKEN: string;
+  TOGGL_API_URL: string;
+  TOGGL_API_TOKEN: string;
+}
+
+function getRequiredEnvVars(): EnvVars {
+  const required = [
+    "REDMINE_API_URL",
+    "REDMINE_TOKEN",
+    "TOGGL_API_URL",
+    "TOGGL_API_TOKEN",
+  ] as const;
+
+  const missing: string[] = [];
+  const vars = {} as EnvVars;
+
+  for (const key of required) {
+    const value = process.env[key];
+    if (!value || value.trim() === "") {
+      missing.push(key);
+    } else {
+      vars[key] = value;
+    }
+  }
+
+  if (missing.length > 0) {
+    console.error("❌ Missing required environment variables:");
+    for (const key of missing) {
+      console.error(`   - ${key}`);
+    }
+    console.error("\nPlease set these in your .env file or environment.");
+    process.exit(1);
+  }
+
+  return vars;
+}
+
 export function configure() {
   // Convert the URL to a file path and calculate the project root
   const __filename = fileURLToPath(import.meta.url);
@@ -44,14 +83,16 @@ export function configure() {
   // Configure dotenv with the path to .env file
   dotenv.config({ path: path.join(rootDir, ".env") });
 
+  const env = getRequiredEnvVars();
+
   initConfig({
     redmine: {
-      baseUrl: validateAndAdjustRedmineUrl(process.env.REDMINE_API_URL!),
-      token: createBasicAuth(process.env.REDMINE_TOKEN!, "pass"),
+      baseUrl: validateAndAdjustRedmineUrl(env.REDMINE_API_URL),
+      token: createBasicAuth(env.REDMINE_TOKEN, "pass"),
     },
     toggl: {
-      baseUrl: removeTrailingSlash(process.env.TOGGL_API_URL!),
-      token: createBasicAuth(process.env.TOGGL_API_TOKEN!, "api_token"),
+      baseUrl: removeTrailingSlash(env.TOGGL_API_URL),
+      token: createBasicAuth(env.TOGGL_API_TOKEN, "api_token"),
     },
   });
 }

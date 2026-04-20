@@ -40,8 +40,9 @@ async function fetchAllProjects(): Promise<Project[]> {
       if (allProjects.length >= result.total_count!) {
         break;
       }
-    } catch (error: any) {
-      console.error("Failed to fetch projects from Redmine:", error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("Failed to fetch projects from Redmine:", errorMessage);
       console.error("🔍 Error details:", { offset, limit });
       throw error;
     }

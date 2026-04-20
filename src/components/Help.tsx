@@ -1,5 +1,5 @@
-import React from "react";
 import { Box, Text } from "ink";
+import React from "react";
 
 export const Help = () => {
   return (
@@ -7,17 +7,12 @@ export const Help = () => {
       <Box flexDirection="column">
         <Text>{"📖 Usage:"}</Text>
         <Text>
-          {"🚀 create-task <taskName> <projectName> - Create a new task"}
+          {"🚀 create-task - Create a new task (interactive)"}
         </Text>
-        <Text>{"🔍 search <query> - Search for issues"}</Text>
+        <Text>{"🔍 search - Search for issues (interactive)"}</Text>
         <Text>
           {
             "⏱️  toggl <daysAgo> <hours> - Import time entries from Toggl to Redmine"
-          }
-        </Text>
-        <Text>
-          {
-            "⏱️  track <issueID> <hours> <comment> <daysAgo> - Track hours directly to a task in Redmine"
           }
         </Text>
         <Text>
@@ -26,17 +21,30 @@ export const Help = () => {
           }
         </Text>
         <Text>
-          {"❌ delete <daysAgo> - Delete a time entry for a specific day"}
+          {"❌ delete <daysAgo> - Delete time entries for a specific day"}
         </Text>
         <Text>
           {
-            "📅 print-monthly-summary - Print a summary of your tracked hours for the current"
+            "📅 print-monthly-summary - Print a summary of your tracked hours for the current month"
+          }
+        </Text>
+        <Text>
+          {
+            "📋 projects - Sync Redmine issues to Toggl projects"
+          }
+        </Text>
+        <Text>
+          {
+            "🔗 import-jira-issue <key...> - Import Jira issues to Redmine"
           }
         </Text>
       </Box>
       <Box flexDirection="column" marginTop={1}>
         <Text>{"⚙️  Options:"}</Text>
         <Text>{"-h, --help  Show help"}</Text>
+      </Box>
+      <Box flexDirection="column" marginTop={1}>
+        <Text dimColor>{"💡 Tip: Press Enter without typing for default 'yes' on prompts"}</Text>
       </Box>
     </Box>
   );

@@ -1,23 +1,38 @@
-import React, { useId, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { CommandsProps } from "./types.js";
 import {
   getDateString,
-  getDaysFromDate
+  getDaysFromDate,
+  formatLocalDate
 } from "../lib/helpers.js";
-import { Box, Text, useApp } from "ink";
+import { Box, Text } from "ink";
 import { useMutation } from "@tanstack/react-query";
 import { prepareRedmineEntries, getOrphanEntries } from "../lib/redmine.js";
 import { ConfirmInput } from "./ConfirmInput.js";
 import SelectInput from "ink-select-input";
-import { createTimeEntry, } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
+import { createTimeEntry, CreateTimeEntryBody } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { useGetMyTimeEntries } from "@saboit/toggl-redmine-bridge/api-toggl-hooks";
 import { OrphanEntryResolver } from "./OrphanEntryResolver.js";
 import { TimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine";
 
-const today = new Date();
-const year = today.getFullYear();
-const month = today.getMonth();
-const days = getDaysFromDate(today);
+const getTodayDateOptions = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const days = getDaysFromDate(today);
+
+  return days
+    .map((day) => {
+      const date = new Date(year, month, day);
+      const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+      const dateString = formatLocalDate(year, month, day);
+      return {
+        label: `${dateString} - ${dayName}`,
+        value: dateString,
+      };
+    })
+    .reverse();
+};
 
 const TogglInternal = ({
   date,
@@ -43,28 +58,28 @@ const TogglInternal = ({
     [timeEntriesForDate, totalHours, resolvedIssueIds]
   );
 
-  const { mutate, isSuccess, isPending, data: submittedEntries, isError } = useMutation({
+  const { mutate, isSuccess, isPending, data: submittedEntries, isError, error } = useMutation({
     mutationKey: ["track", date],
     mutationFn: async () => {
       const createdEntries: TimeEntry[] = [];
       const failedEntries: string[] = [];
       for (const entry of entries) {
         try {
-          const result = await createTimeEntry('json', entry as any);
+          const result = await createTimeEntry('json', entry as CreateTimeEntryBody);
           const created = result.time_entry;
           createdEntries.push(created as TimeEntry);
-        } catch (error: any) {
-          const msg = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${error.message}`;
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          const msg = `Redmine entry "${entry.time_entry.issue_id} ${entry.time_entry.comments}" ERROR ${errorMsg}`;
           failedEntries.push(msg);
-          throw error;
+          // Continue processing other entries instead of throwing
         }
       }
       return { createdEntries, failedEntries };
     },
   });
 
-
-  const { createdEntries, failedEntries } = submittedEntries ?? {};
+  const { createdEntries, failedEntries } = submittedEntries ?? { createdEntries: [], failedEntries: [] };
 
   if (isLoading) {
     return <Text>Loading...</Text>;
@@ -92,10 +107,10 @@ const TogglInternal = ({
     return <Text>Tracking time entries...</Text>;
   }
 
-  if (isSuccess || isError) {
+  if (isSuccess) {
     return (
       <Box flexDirection="column">
-        <Text>Time entries tracked successfully!</Text>
+        <Text color="green">Time entries tracked successfully!</Text>
         {createdEntries && createdEntries.length > 0 && (
           <Box flexDirection="column">
             <Text>Created entries:</Text>
@@ -114,6 +129,14 @@ const TogglInternal = ({
         )}
       </Box>
     )
+  }
+
+  if (isError) {
+    return (
+      <Box flexDirection="column">
+        <Text color="red">Error tracking time entries: {(error as Error).message}</Text>
+      </Box>
+    );
   }
 
   const hoursToReport = totalHours ?? entries.reduce((sum, entry) => sum + (entry.time_entry.hours || 0), 0);
@@ -153,19 +176,6 @@ const TogglInternal = ({
   );
 };
 
-const options = days
-  .map((day) => {
-    const date = new Date(year, month, day);
-    const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-    date.setDate(date.getDate() + 1);
-    const dateString = date.toISOString().split("T")[0];
-    return {
-      label: `${dateString} - ${dayName}`,
-      value: dateString,
-    };
-  })
-  .reverse();
-
 export const Toggl = ({ args }: CommandsProps) => {
   const [arg1, arg2] = args ?? [];
   const daysAgo = parseInt(arg1);
@@ -184,7 +194,7 @@ export const Toggl = ({ args }: CommandsProps) => {
       <Box flexDirection="column">
         <Text>Select a date:</Text>
         <SelectInput
-          items={options}
+          items={getTodayDateOptions()}
           limit={10}
           onSelect={(item) => setSelectedDate(item.value)}
         />

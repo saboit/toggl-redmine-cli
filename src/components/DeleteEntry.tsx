@@ -1,30 +1,73 @@
-import React, { Fragment, useEffect, useState } from "react";
+import React, { Fragment, useState } from "react";
 import { CommandsProps } from "./types.js";
 import { getDateString } from "../lib/helpers.js";
 import { useGetTimeEntries, useDeleteTimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
 import { TimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine";
+import { deleteTimeEntry } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
+import { useMutation } from "@tanstack/react-query";
 
 type DeleteOption = 'all' | 'select';
 
+interface BatchDeleteResult {
+  successCount: number;
+  failedCount: number;
+  errors: string[];
+}
 
 const DeleteAllEntries = ({ date, entries }: { date: string, entries: TimeEntry[] }) => {
-  const { mutate, isPending, isSuccess, isError, error } = useDeleteTimeEntry();
-  useEffect(() => {
-    if (entries.length > 0) {
-      entries.forEach(entry => {
-        mutate({ timeEntryId: entry.id, format: 'json' });
-      });
-    }
-  }, [entries, mutate]);
+  const { mutate, isPending, isSuccess, isError, data, error } = useMutation<BatchDeleteResult, Error, void>({
+    mutationKey: ["deleteAll", date],
+    mutationFn: async () => {
+      const result: BatchDeleteResult = { successCount: 0, failedCount: 0, errors: [] };
+
+      for (const entry of entries) {
+        try {
+          await deleteTimeEntry(entry.id, 'json');
+          result.successCount++;
+        } catch (err: unknown) {
+          result.failedCount++;
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          result.errors.push(`Entry #${entry.id}: ${errorMsg}`);
+        }
+      }
+
+      // Throw if all failed to trigger error state
+      if (result.successCount === 0 && result.failedCount > 0) {
+        throw new Error(`Failed to delete all ${result.failedCount} entries`);
+      }
+
+      return result;
+    },
+  });
+
+  // Trigger mutation on first render only
+  React.useEffect(() => {
+    mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <Box flexDirection="column">
       <Text color="yellow">Deleting all entries from {date}...</Text>
-      {isPending && <Text color="yellow">Deleting...</Text>}
-      {isSuccess && <Text color="green">Entries deleted successfully</Text>}
-      {isError && <Text color="red">{`Error: ${error && 'errors' in error ? error.errors.join(', ') : 'Unknown error'}`}</Text>}
+      {isPending && <Text color="yellow">Deleting {entries.length} entries...</Text>}
+      {isSuccess && (
+        <Box flexDirection="column">
+          <Text color="green">
+            {data!.successCount} entries deleted successfully
+          </Text>
+          {data!.failedCount > 0 && (
+            <>
+              <Text color="red">{data!.failedCount} entries failed to delete</Text>
+              {data!.errors.map((err, idx) => (
+                <Text key={idx} color="red">  - {err}</Text>
+              ))}
+            </>
+          )}
+        </Box>
+      )}
+      {isError && <Text color="red">{`Error: ${error.message}`}</Text>}
     </Box>
   );
 }

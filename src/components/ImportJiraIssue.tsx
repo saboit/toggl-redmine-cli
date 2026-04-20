@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
 import TextInput from "ink-text-input";
@@ -8,8 +8,6 @@ import { fetchJiraIssue, JiraIssue } from "../lib/jira.js";
 import { fetchAllProjects } from "../lib/redmine.js";
 import { getSearch, createIssue } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { ConfirmInput } from "./ConfirmInput.js";
-import { useEventCallback } from "../lib/hooks.js";
-
 
 interface LoadedData {
   jiraIssue: JiraIssue;
@@ -27,6 +25,12 @@ export const JiraIssueImporter = ({
   onSkip?: () => void;
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+
+  // Ref pattern to access latest onDone without triggering effect re-runs
+  const onDoneRef = useRef(onDone);
+  useLayoutEffect(() => {
+    onDoneRef.current = onDone;
+  });
 
   const { data, isLoading, isError, error } = useQuery<LoadedData>({
     queryKey: ["jira-import", jiraKey],
@@ -60,21 +64,18 @@ export const JiraIssueImporter = ({
     },
   });
 
-  const doneEvent = useEventCallback((id: number) => {
-    onDone(id);
-  })
-
   const redmineExistingId = data?.existingRedmineId;
 
   // Both must be before any early returns to satisfy Rules of Hooks.
   // useEffect ensures the frame renders first before onDone() advances the parent.
   useEffect(() => {
-    if (redmineExistingId) doneEvent(redmineExistingId);
-  }, [redmineExistingId, doneEvent]);
+    if (redmineExistingId) onDoneRef.current(redmineExistingId);
+  }, [redmineExistingId]);
 
   useEffect(() => {
-    if (isSuccess) doneEvent(created!.id);
-  }, [created, doneEvent, isSuccess]);
+    if (isSuccess) onDoneRef.current(created!.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSuccess, created?.id]);
 
   if (isLoading) {
     return <Text>Fetching {jiraKey}...</Text>;

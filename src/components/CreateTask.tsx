@@ -5,9 +5,12 @@ import SelectInput from "ink-select-input";
 import { useCreateIssue, useGetProjects } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 import { ConfirmInput } from "./ConfirmInput.js";
 
+// Tracker IDs for common Redmine configurations.
+// These should match your Redmine instance's tracker IDs.
+// Common defaults: Bug = 1, Task/Feature = 2 or 4
 const taskOptions = [
-  { label: "Task", value: "Task" },
-  { label: "Bug", value: "Bug" },
+  { label: "Task", value: 4 },
+  { label: "Bug", value: 1 },
 ];
 
 const defaultProjectId = process.env.DEFAULT_PROJECT;
@@ -16,7 +19,7 @@ const TaskCreator = ({ projectId }: { projectId: string }) => {
   const { mutate, isPending, isSuccess, isError, error } = useCreateIssue()
   const [taskName, setTaskName] = useState("");
   const [submittedTaskName, setSubmittedTaskName] = useState("");
-  const [taskType, setTaskType] = useState<string | null>(null);
+  const [taskType, setTaskType] = useState<number | null>(null);
   const [description, setDescription] = useState("");
 
   if (!submittedTaskName) {
@@ -29,7 +32,7 @@ const TaskCreator = ({ projectId }: { projectId: string }) => {
       />
     );
   }
-  if (!taskType) {
+  if (taskType === null) {
     return (
       <SelectInput
         items={taskOptions}
@@ -54,7 +57,7 @@ const TaskCreator = ({ projectId }: { projectId: string }) => {
                 project_id: projectId,
                 subject: submittedTaskName,
                 description,
-                tracker_id: Number(taskType)
+                tracker_id: taskType
               },
             }
           });
@@ -90,16 +93,20 @@ export const CreateTask = () => {
     );
   }
 
+  if (isLoading) {
+    return <Text>Loading projects...</Text>;
+  }
+
   if (!projectId) {
     const options = projects.map((project) => {
       return {
-        value: project.name,
+        value: project.id.toString(),
         label: project.name,
       };
     });
     return (
       <Box flexDirection="column">
-        {!projectId && !defaultProjectId && (
+        {!defaultProjectId && (
           <Text color="red">Default project not found please select one:</Text>
         )}
         <SelectInput
@@ -111,10 +118,6 @@ export const CreateTask = () => {
         />
       </Box>
     );
-  }
-
-  if (isLoading) {
-    return <Text>Loading projects...</Text>;
   }
 
   return <TaskCreator projectId={projectId} />;

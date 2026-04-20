@@ -22,11 +22,21 @@ export interface JiraIssue {
   };
 }
 
-export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
-  const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
-  const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
+// Read Jira config once at module load
+const JIRA_API_URL = process.env.JIRA_API_URL;
+const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
 
-  const response = await fetch(`${JIRA_API_URL}/jira/rest/api/2/issue/${key}`, {
+function getJiraBaseUrl(): string {
+  if (!JIRA_API_URL) {
+    throw new Error("JIRA_API_URL environment variable is not set");
+  }
+  return JIRA_API_URL;
+}
+
+export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
+  const baseUrl = getJiraBaseUrl();
+
+  const response = await fetch(`${baseUrl}/issue/${key}`, {
     headers: {
       Authorization: `Bearer ${JIRA_API_KEY}`,
       "Content-Type": "application/json",
@@ -39,11 +49,19 @@ export const fetchJiraIssue = async (key: string): Promise<JiraIssue> => {
   return response.json() as Promise<JiraIssue>;
 };
 
-export const getIssuesFromJiraQuery = async (query: string) => {
-  const JIRA_API_URL = process.env.JIRA_API_URL ?? "/jira-api";
-  const JIRA_API_KEY = process.env.JIRA_API_KEY || "";
+export interface JiraSearchResponse {
+  expand: string;
+  startAt: number;
+  maxResults: number;
+  total: number;
+  issues: JiraIssue[];
+}
+
+export const getIssuesFromJiraQuery = async (query: string): Promise<JiraSearchResponse> => {
+  const baseUrl = getJiraBaseUrl();
+
   const response = await fetch(
-    `${JIRA_API_URL}/search?jql=${encodeURIComponent(query)}`,
+    `${baseUrl}/search?jql=${encodeURIComponent(query)}`,
     {
       headers: {
         Authorization: `Bearer ${JIRA_API_KEY}`,
@@ -57,6 +75,5 @@ export const getIssuesFromJiraQuery = async (query: string) => {
       `Failed to fetch issues from Jira: ${response.status} ${response.statusText} - ${errorText}`,
     );
   }
-  const data: JiraIssueResponse = await response.json();
-  return data;
+  return response.json() as Promise<JiraSearchResponse>;
 };

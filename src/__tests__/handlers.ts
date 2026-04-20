@@ -16,7 +16,8 @@ const defaultSearchResults = [
   { id: 67890, title: "Fix dashboard layout" },
 ];
 
-const today = new Date().toISOString().split("T")[0];
+// Use local date format to match getDateString() behavior
+const today = new Date().toLocaleDateString('en-CA');
 
 const defaultTogglEntries = [
   {
@@ -84,7 +85,7 @@ export const mockRedmineCreateIssue = (
   );
 
 export const mockJiraIssue = (_key = "PROJ-123") =>
-  http.get(`${JIRA_BASE_URL}/rest/api/3/issue/:key`, ({ params }) =>
+  http.get(`${JIRA_BASE_URL}/jira/rest/api/2/issue/:key`, ({ params }) =>
     HttpResponse.json({
       key: params.key,
       fields: {
@@ -98,6 +99,6 @@ export const mockJiraIssue = (_key = "PROJ-123") =>
   );
 
 export const mockJiraIssueError = (status = 404) =>
-  http.get(`${JIRA_BASE_URL}/rest/api/3/issue/:key`, () =>
+  http.get(`${JIRA_BASE_URL}/jira/rest/api/2/issue/:key`, () =>
     HttpResponse.json({ message: "Issue not found" }, { status }),
   );

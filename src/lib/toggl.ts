@@ -6,6 +6,17 @@ import {
 } from "@saboit/toggl-redmine-bridge/api-toggl";
 import { IssueSimple } from "@saboit/toggl-redmine-bridge/api-redmine-hooks";
 
+/**
+ * Formats timezone offset in minutes as ISO 8601 string (e.g., "+05:30" or "-08:00")
+ */
+function formatTimezoneOffset(offsetMinutes: number): string {
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absMinutes = Math.abs(offsetMinutes);
+  const hours = Math.floor(absMinutes / 60);
+  const minutes = absMinutes % 60;
+  return `${sign}${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
 export async function fetchTogglTimeEntries(
   date: string,
   togglWorkspaceId: number,
@@ -15,14 +26,11 @@ export async function fetchTogglTimeEntries(
   // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/getTimezoneOffset#negative_values_and_positive_values
   // Hence the negation in the following line
   const localMachineTZOffsetMinutes = -new Date(date).getTimezoneOffset();
-  const tzOffsetHrsFormatted =
-    localMachineTZOffsetMinutes < 0
-      ? "-"
-      : "+" + `00${Math.abs(localMachineTZOffsetMinutes / 60)}`.slice(-2);
+  const tzOffsetFormatted = formatTimezoneOffset(localMachineTZOffsetMinutes);
 
   const params = {
-    start_date: `${date}T00:00:00${tzOffsetHrsFormatted}:00`,
-    end_date: `${date}T23:59:59${tzOffsetHrsFormatted}:00`,
+    start_date: `${date}T00:00:00${tzOffsetFormatted}`,
+    end_date: `${date}T23:59:59${tzOffsetFormatted}`,
     workspace_id: togglWorkspaceId,
   };
 

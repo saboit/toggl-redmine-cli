@@ -38,8 +38,6 @@ export default tseslint.config(
       ],
       // Downgrade to warn: many API calls use `as any` due to imperfect generated types
       "@typescript-eslint/no-explicit-any": "warn",
-      // Requires ES2022 Error cause — incompatible with this project's ES2020 target
-      "preserve-caught-error": "off",
     },
   },
 );
